@@ -15,7 +15,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldColors
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,7 +26,6 @@ import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.modifier.modifierLocalConsumer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
@@ -36,7 +34,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.zIndex
 import com.havok.contrail.R
 import kotlin.math.*
@@ -46,23 +43,41 @@ fun HomeScreen(
     onButtonClick: (() -> Boolean)? = null,
     onActionButtonClick: ((String) -> Unit)? = null,
     onJoystickMoved: ((Float, Float) -> Unit)? = null,
+    onRotStickMoved: ((Float) -> Unit)? = null,
     logs: List<String>,
-    onSaveClick: (ip: String, port: String) -> Unit
+    onSaveClick: (ip: String, port: String, fl: String, fr: String, br: String, bl: String) -> Unit,
+    ip: String = "10.38.3.118",
+    port: String = "4000",
+    motorSpeedCoefficient: FloatArray
 ) {
 
-    var socketIP by remember { mutableStateOf("10.38.3.118") }
-    var socketPort by remember { mutableStateOf("4000") }
+    var socketIP by remember { mutableStateOf(ip) }
+    var socketPort by remember { mutableStateOf(port) }
     var showSettings by remember { mutableStateOf(false) }
+    var curMotorSpeedCoefficient by remember {
+        mutableStateOf(motorSpeedCoefficient)
+    }
 
     fun onClickSettings() {
         showSettings = !showSettings
     }
-    PopupBox(popupWidth = 400F, popupHeight = 300F, showPopup = showSettings) {
+    fun onClickSave(ip: String, port: String, fl: String, fr: String, br: String, bl: String) {
+        socketIP = ip
+        socketPort = port
+        curMotorSpeedCoefficient[2] = fl.toFloat()
+        curMotorSpeedCoefficient[3] = fr.toFloat()
+        curMotorSpeedCoefficient[0] = br.toFloat()
+        curMotorSpeedCoefficient[1] = bl.toFloat()
+    }
+
+    PopupBox(popupWidth = 400F, popupHeight = 360F, showPopup = showSettings) {
         SettingsOverlay(
             socketIP = socketIP,
             socketPort = socketPort,
             onDismiss = { showSettings = false },
-            onSaveClick = onSaveClick
+            onSaveClick = onSaveClick,
+            onClickSave = ::onClickSave,
+            motorSpeedCoefficient = motorSpeedCoefficient
         )
     }
 
@@ -86,17 +101,29 @@ fun HomeScreen(
             }
 
             Row(
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 JoyStick(
                     onMoved = { x, y ->
-                        onJoystickMoved?.invoke(x, y)
+                        onJoystickMoved?.invoke(x, -y)
                     }
                 )
-                StatusWidget(logs)
                 ActionButtonContainer(onActionButtonClick)
+
+                Column(
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    StatusWidget(logs = logs)
+                    Spacer(modifier = Modifier.height(40.dp))
+                    HorizontalJoyStick(
+                        onMoved = { x ->
+                            onRotStickMoved?.invoke(x)
+                        }
+                    )
+                }
             }
         }
     }
@@ -293,12 +320,93 @@ fun JoyStick(
 }
 
 @Composable
+fun HorizontalJoyStick(
+    modifier: Modifier = Modifier,
+    size: Dp = 180.dp,
+    dotSize: Dp = 40.dp,
+    backgroundImage: Int = R.drawable.rect_background,
+    dotImage: Int = R.mipmap.phoenix_logo,
+    onMoved: (Float) -> Unit = { _ -> }
+) {
+    Box(
+        modifier = modifier
+            .width(size)
+            .height(60.dp)
+
+    ) {
+        val maxRadius = with(LocalDensity.current) { (size / 2).toPx() }
+        val centerX = with(LocalDensity.current) { ((size - dotSize) / 2).toPx() }
+        val centerY = with(LocalDensity.current) { ((60.dp - dotSize) / 2).toPx() }
+
+        var offsetX by remember { mutableStateOf(centerX) }
+        var offsetY by remember { mutableStateOf(centerY) }
+
+        var radius by remember { mutableStateOf(0f) }
+
+        Box(
+            modifier = Modifier
+                .height(60.dp)
+                .width(size)
+                .onGloballyPositioned {
+                    radius = it.size.width.toFloat() / 2f
+                }
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragEnd = {
+                            offsetX = centerX
+                            offsetY = centerY
+                            onMoved(0f)
+                        },
+                        onDrag = { change: PointerInputChange, _: Offset ->
+                            val x = change.position.x
+                            val distance = abs(x - radius)
+
+                            offsetX = if (distance < maxRadius) {
+                                x - (dotSize.toPx() / 2)
+                            } else {
+                                val ratio = maxRadius / distance
+                                val constrainedX = (x - radius) * ratio + radius
+                                constrainedX - (dotSize.toPx() / 2)
+                            }
+
+                            val xPercent = ((offsetX - centerX) / centerX).coerceIn(-1f, 1f)
+
+                            onMoved(xPercent)
+                        }
+                    )
+                }
+        ) {
+            Image(
+                painter = painterResource(backgroundImage),
+                contentDescription = "Joystick Background",
+                contentScale = ContentScale.FillBounds,
+                modifier = Modifier.fillMaxSize()
+            )
+            Image(
+                painter = painterResource(dotImage),
+                contentDescription = "Joystick Dot",
+                contentScale = ContentScale.FillBounds,
+                modifier = Modifier
+                    .size(dotSize)
+                    .offset {
+                        IntOffset(
+                            offsetX.roundToInt(),
+                            centerY.roundToInt()  // Keep y-coordinate fixed
+                        )
+                    }
+                    .clip(CircleShape)
+            )
+        }
+    }
+}
+
+@Composable
 fun StatusWidget(
     logs: List<String>
 ) {
     Box(modifier = Modifier
         .clip(RoundedCornerShape(topStart = 10.dp, bottomEnd = 10.dp))
-        .height(200.dp)
+        .height(160.dp)
         .width(280.dp)
         .background(Color.Black)
     ) {
@@ -380,8 +488,10 @@ fun PopupBox(
 fun SettingsOverlay(
     socketIP: String,
     socketPort: String,
+    motorSpeedCoefficient: FloatArray,
     onDismiss: () -> Unit,
-    onSaveClick: (ip: String, port: String) -> Unit
+    onSaveClick: (ip: String, port: String, fl: String, fr: String, br: String, bl: String) -> Unit,
+    onClickSave: (ip: String, port: String, fl: String, fr: String, br: String, bl: String) ->Unit,
 ) {
 
     var currentIp by remember {
@@ -390,7 +500,18 @@ fun SettingsOverlay(
     var currentPort by remember {
         mutableStateOf(socketPort)
     }
-
+    var flCoefficient by remember {
+        mutableStateOf(motorSpeedCoefficient[2].toString())
+    }
+    var frCoefficient by remember {
+        mutableStateOf(motorSpeedCoefficient[3].toString())
+    }
+    var brCoefficient by remember {
+        mutableStateOf(motorSpeedCoefficient[0].toString())
+    }
+    var blCoefficient by remember {
+        mutableStateOf(motorSpeedCoefficient[1].toString())
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -449,7 +570,62 @@ fun SettingsOverlay(
                     textColor = Color.White
                 )
             )
-
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+            ) {
+                TextField(
+                    value = flCoefficient,
+                    onValueChange = {flCoefficient = it},
+                    label = { Text(text = "FL", color=Color.White, fontFamily = FontFamily.Monospace) },
+                    modifier = Modifier
+                        .background(Color.Black)
+                        .width(80.dp),
+                    colors = TextFieldDefaults.textFieldColors(
+                        containerColor = Color.Black,
+                        textColor = Color.White
+                    )
+                )
+                TextField(
+                    value = frCoefficient,
+                    onValueChange = {frCoefficient = it },
+                    label = { Text(text = "FR", color=Color.White, fontFamily = FontFamily.Monospace) },
+                    modifier = Modifier
+                        .background(Color.Black)
+                        .width(80.dp),
+                    colors = TextFieldDefaults.textFieldColors(
+                        containerColor = Color.Black,
+                        textColor = Color.White
+                    )
+                )
+                TextField(
+                    value = brCoefficient,
+                    onValueChange = {brCoefficient = it },
+                    label = { Text(text = "BR", color=Color.White, fontFamily = FontFamily.Monospace) },
+                    modifier = Modifier
+                        .background(Color.Black)
+                        .width(80.dp),
+                    colors = TextFieldDefaults.textFieldColors(
+                        containerColor = Color.Black,
+                        textColor = Color.White
+                    )
+                )
+                TextField(
+                    value = blCoefficient,
+                    onValueChange = {blCoefficient = it },
+                    label = { Text(text = "BL", color=Color.White, fontFamily = FontFamily.Monospace) },
+                    modifier = Modifier
+                        .background(Color.Black)
+                        .width(80.dp),
+                    colors = TextFieldDefaults.textFieldColors(
+                        containerColor = Color.Black,
+                        textColor = Color.White
+                    )
+                )
+            }
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(
@@ -457,7 +633,7 @@ fun SettingsOverlay(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Button(
-                    onClick = { onSaveClick(currentIp, currentPort); onDismiss() },
+                    onClick = { onSaveClick(currentIp, currentPort, flCoefficient, frCoefficient, brCoefficient, blCoefficient); onDismiss(); onClickSave(currentIp, currentPort, flCoefficient, frCoefficient, brCoefficient, blCoefficient)},
                     modifier = Modifier.padding(start = 8.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color.Black,
@@ -488,24 +664,24 @@ fun ActionButtonContainer(onActionButtonClick: ((String) -> Unit)?) {
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier.fillMaxWidth()
         ) {
-            ActionButton(btnText = "PICK", onButtonClick = { onActionButtonClick?.invoke("PICK") })
-            ActionButton(btnText = "DROP", onButtonClick = { onActionButtonClick?.invoke("DROP") })
+            ActionButton(btnText = "PICK", onButtonClick = { onActionButtonClick?.invoke("g") })
+            ActionButton(btnText = "DROP", onButtonClick = { onActionButtonClick?.invoke("l") })
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier.fillMaxWidth()
         ) {
-            ActionButton(btnText = "LOWER", onButtonClick = { onActionButtonClick?.invoke("LOWER") })
-            ActionButton(btnText = "RAISE", onButtonClick = { onActionButtonClick?.invoke("RAISE") })
+            ActionButton(btnText = "LOWER", onButtonClick = { onActionButtonClick?.invoke("d") })
+            ActionButton(btnText = "RAISE", onButtonClick = { onActionButtonClick?.invoke("u") })
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier.fillMaxWidth()
         ) {
-            ActionButton(btnText = "STOP", onButtonClick = { onActionButtonClick?.invoke("STOP") })
-            ActionButton(btnText = "SHOOT", onButtonClick = { onActionButtonClick?.invoke("SHOOT") })
+            ActionButton(btnText = "STOP", onButtonClick = { onActionButtonClick?.invoke("e") })
+            ActionButton(btnText = "SHOOT", onButtonClick = { onActionButtonClick?.invoke("r") })
         }
     }
 }

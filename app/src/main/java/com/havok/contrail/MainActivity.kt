@@ -24,6 +24,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var webSocket: WebSocket
     private lateinit var socketIP: String
     private lateinit var socketPort: String
+    private lateinit var motorSpeedCoefficient: FloatArray
 
     private var connected by mutableStateOf(false)
     private var logs = mutableStateOf(listOf<String>())
@@ -38,12 +39,19 @@ class MainActivity : ComponentActivity() {
                         sendAction(action)
                         addLog("Action: $action")
                     },
+                    onRotStickMoved = { x ->
+                        sendRotStickPosition(x)
+                        addLog("{\"x\": %.2f}".format(x))
+                    },
                     onJoystickMoved = { x, y ->
                         sendJoystickPosition(x, y)
-                        addLog("{\"x\": %.3f, \"y\": %.3f}".format(x, y))
+                        addLog("{\"x\": %.2f, \"y\": %.2f}".format(x, y))
                     },
                     logs = logs.value,
-                    onSaveClick = ::onSaveClick
+                    onSaveClick = ::onSaveClick,
+                    ip = socketIP,
+                    port = socketPort,
+                    motorSpeedCoefficient = motorSpeedCoefficient
                 )
             }
         }
@@ -53,13 +61,14 @@ class MainActivity : ComponentActivity() {
             .connectTimeout(5, TimeUnit.SECONDS)
             .build()
 
-        socketIP = "10.38.3.118"
-        socketPort = "4000"
+        socketIP = "192.168.61.78"
+        socketPort = "80"
+        motorSpeedCoefficient = floatArrayOf(1f, 1f, 1f, 1f)
     }
 
     private fun handleConnection(): Boolean {
         if (!connected) {
-            val request = Request.Builder().url("ws://$socketIP:$socketPort/").build()
+            val request = Request.Builder().url("ws://$socketIP:${socketPort}/").build()
 
             webSocket = client.newWebSocket(request, object: WebSocketListener() {
                 override fun onOpen(webSocket: WebSocket, response: Response) {
@@ -110,27 +119,53 @@ class MainActivity : ComponentActivity() {
 
     private fun sendAction(action: String) {
         if (connected) {
-            webSocket.send(action)
+            val msg = "{\"type\": \"BSTS\", \"action\": \"${action}\"}"
+            webSocket.send(msg)
         }
     }
 
     private fun sendJoystickPosition(x: Float, y: Float) {
         if (connected) {
-            val position = "{\"x\": %.3f, \"y\": %.3f}".format(x, y)
+            val posX: Int = (x*100f).toInt()
+            val posY: Int = (y*100f).toInt()
+            val position = "{\"type\": \"PSJ\", \"x\": %d, \"y\": %d}".format(posX, posY)
             webSocket.send(position)
+        }
+    }
+
+    private fun sendRotStickPosition(x: Float) {
+        if (connected) {
+            val posX: Int = (x*100f).toInt()
+            val position = "{\"type\": \"RTJ\", \"x\": %d}".format(posX)
+            webSocket.send(position)
+        }
+    }
+
+    private fun sendMotorSpeedCoefficient(motorSpeedCoefficient: FloatArray) {
+        if (connected) {
+            val msg = "{\"type\": \"BSTS\",\"action\": \"asc\", \"c1\": %.2f, \"c2\": %.2f, \"c3\": %.2f, \"c4\": %.2f}".format(motorSpeedCoefficient[0], motorSpeedCoefficient[1], motorSpeedCoefficient[2], motorSpeedCoefficient[3])
+            webSocket.send(msg)
         }
     }
 
     private fun addLog(message: String) {
         GlobalScope.launch(Dispatchers.Main) {
-            logs.value = logs.value.takeLast(6) + message // Keep last 5 logs
+            logs.value = logs.value.takeLast(2) + message // Keep last 5 logs
         }
     }
 
-    private fun onSaveClick(ip: String, port: String) {
-        socketIP = ip
-        socketPort = port
+    private fun onSaveClick(ip: String, port: String, fl: String, fr: String, br: String, bl: String) {
+        this.socketIP = ip
+        this.socketPort = port
+        this.motorSpeedCoefficient[2] = fl.toFloat()
+        this.motorSpeedCoefficient[3] = fr.toFloat()
+        this.motorSpeedCoefficient[0] = br.toFloat()
+        this.motorSpeedCoefficient[1] = bl.toFloat()
+
+        sendMotorSpeedCoefficient(motorSpeedCoefficient)
+
         addLog("IP changed to $socketIP")
         addLog("Port changed to $socketPort")
+        addLog("Coefficient C1: %.2f, C2: %.2f, C3: %.2f, C4: %.2f".format(motorSpeedCoefficient[0], motorSpeedCoefficient[1], motorSpeedCoefficient[2], motorSpeedCoefficient[3]))
     }
 }
