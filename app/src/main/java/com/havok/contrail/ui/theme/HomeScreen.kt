@@ -1,6 +1,7 @@
 package com.havok.contrail.ui.theme
 
 import android.util.Log
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -13,6 +14,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -36,6 +39,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.havok.contrail.R
+import kotlinx.coroutines.delay
 import kotlin.math.*
 
 @Composable
@@ -45,7 +49,7 @@ fun HomeScreen(
     onJoystickMoved: ((Float, Float) -> Unit)? = null,
     onRotStickMoved: ((Float) -> Unit)? = null,
     logs: List<String>,
-    onSaveClick: (ip: String, port: String, fl: String, fr: String, br: String, bl: String) -> Unit,
+    onSaveClick: (ip: String, port: String, fl: Float, fr: Float, br: Float, bl: Float) -> Unit,
     ip: String = "10.38.3.118",
     port: String = "4000",
     motorSpeedCoefficient: FloatArray
@@ -61,13 +65,13 @@ fun HomeScreen(
     fun onClickSettings() {
         showSettings = !showSettings
     }
-    fun onClickSave(ip: String, port: String, fl: String, fr: String, br: String, bl: String) {
+    fun onClickSave(ip: String, port: String, fl: Float, fr: Float, br: Float, bl: Float) {
         socketIP = ip
         socketPort = port
-        curMotorSpeedCoefficient[2] = fl.toFloat()
-        curMotorSpeedCoefficient[3] = fr.toFloat()
-        curMotorSpeedCoefficient[0] = br.toFloat()
-        curMotorSpeedCoefficient[1] = bl.toFloat()
+        curMotorSpeedCoefficient[2] = fl
+        curMotorSpeedCoefficient[3] = fr
+        curMotorSpeedCoefficient[0] = br
+        curMotorSpeedCoefficient[1] = bl
     }
 
     PopupBox(popupWidth = 400F, popupHeight = 360F, showPopup = showSettings) {
@@ -82,47 +86,101 @@ fun HomeScreen(
     }
 
     Box(modifier = Modifier
-        .background(Grey80)
-        .fillMaxSize()) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween,
+        .fillMaxSize()
+        .background(Grey80)) {
+        Row(
             modifier = Modifier
-                .fillMaxHeight()
-                .padding(15.dp)
+                .fillMaxSize()
+                .padding(5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement =  Arrangement.SpaceEvenly
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()) {
-                SettingsButton { onClickSettings() }
-                AppTitle()
-                ConnectButton(onButtonClick)
-            }
-
-            Row(
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
+            Column (
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(400.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                JoyStick(
-                    onMoved = { x, y ->
-                        onJoystickMoved?.invoke(x, -y)
-                    }
-                )
-                ActionButtonContainer(onActionButtonClick)
+                Row (modifier = Modifier
+                    .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                    ) {
+                    SettingsButton { onClickSettings() }
+                    ConnectButton(onButtonClick)
+                }
 
-                Column(
-                    verticalArrangement = Arrangement.SpaceBetween,
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp)
                 ) {
                     StatusWidget(logs = logs)
-                    Spacer(modifier = Modifier.height(40.dp))
+                }
+
+                Row(
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp)
+                ) {
+                    JoyStick(
+                        onMoved = { x, y ->
+                            onJoystickMoved?.invoke(x, -y)
+                        }
+                    )
+                    FineDriveContainer(onActionButtonClick)
+                }
+            }
+
+            Column (modifier = Modifier
+                .fillMaxHeight()
+                .width(400.dp)
+                .padding(5.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AppTitle()
+                }
+                Row (
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    ActionButtonColumnLeft(onActionButtonClick)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    ActionButtonContainer(onActionButtonClick)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    ActionButtonColumnRight(onActionButtonClick)
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    DirectionButton({onActionButtonClick?.invoke("<")}, R.drawable.rotate_left_icon, {onActionButtonClick?.invoke("x")})
+                    Spacer(modifier = Modifier.width(10.dp))
                     HorizontalJoyStick(
                         onMoved = { x ->
                             onRotStickMoved?.invoke(x)
                         }
                     )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    DirectionButton({onActionButtonClick?.invoke(">")}, R.drawable.rotate_right_icon, {onActionButtonClick?.invoke("x")})
                 }
             }
         }
@@ -166,7 +224,8 @@ fun ConnectButton(
 @Composable
 fun ActionButton(
     btnText: String,
-    onButtonClick: (() -> Unit)? = null
+    onButtonClick: (() -> Unit)? = null,
+    secondaryColor: Color
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -179,18 +238,20 @@ fun ActionButton(
         interactionSource = interactionSource,
         enabled = true,
         modifier = Modifier
-            .height(50.dp)
-            .width(140.dp),
-        shape = RoundedCornerShape(topStart = 10.dp, bottomEnd = 10.dp),
+            .height(60.dp)
+            .width(60.dp),
+        shape = CircleShape,
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 10.dp),
         colors = ButtonDefaults.buttonColors(
-            contentColor = if (isPressed) Color.Black else Color.hsl(36f, 0.98f, 0.48f),
-            containerColor = if (isPressed) Color.hsl(36f, 0.98f, 0.48f) else Color.Black,
+            contentColor = if (isPressed) Color.Black else secondaryColor,
+            containerColor = if (isPressed) secondaryColor else Color.Black,
         ),
+        contentPadding = PaddingValues(10.dp)
     ) {
         Text(
             text = btnText,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.bodyMedium
         )
     }
 }
@@ -220,7 +281,7 @@ fun SettingsButton(onSettingsClick: () -> Unit) {
 fun AppTitle() {
     Box(modifier = Modifier
         .height(50.dp)
-        .width(300.dp)
+        .width(280.dp)
         .clip(
             CircleShape
         )) {
@@ -241,8 +302,8 @@ fun AppTitle() {
 @Composable
 fun JoyStick(
     modifier: Modifier = Modifier,
-    size: Dp = 170.dp,
-    dotSize: Dp = 40.dp,
+    size: Dp = 140.dp,
+    dotSize: Dp = 30.dp,
     backgroundImage: Int = R.drawable.joy_stick_background,
     dotImage: Int = R.mipmap.phoenix_logo,
     onMoved: (Float, Float) -> Unit = { _, _ -> }
@@ -322,8 +383,8 @@ fun JoyStick(
 @Composable
 fun HorizontalJoyStick(
     modifier: Modifier = Modifier,
-    size: Dp = 180.dp,
-    dotSize: Dp = 40.dp,
+    size: Dp = 160.dp,
+    dotSize: Dp = 30.dp,
     backgroundImage: Int = R.drawable.rect_background,
     dotImage: Int = R.mipmap.phoenix_logo,
     onMoved: (Float) -> Unit = { _ -> }
@@ -331,12 +392,12 @@ fun HorizontalJoyStick(
     Box(
         modifier = modifier
             .width(size)
-            .height(60.dp)
+            .height(50.dp)
 
     ) {
         val maxRadius = with(LocalDensity.current) { (size / 2).toPx() }
         val centerX = with(LocalDensity.current) { ((size - dotSize) / 2).toPx() }
-        val centerY = with(LocalDensity.current) { ((60.dp - dotSize) / 2).toPx() }
+        val centerY = with(LocalDensity.current) { ((50.dp - dotSize) / 2).toPx() }
 
         var offsetX by remember { mutableStateOf(centerX) }
         var offsetY by remember { mutableStateOf(centerY) }
@@ -345,7 +406,7 @@ fun HorizontalJoyStick(
 
         Box(
             modifier = Modifier
-                .height(60.dp)
+                .height(50.dp)
                 .width(size)
                 .onGloballyPositioned {
                     radius = it.size.width.toFloat() / 2f
@@ -405,28 +466,36 @@ fun StatusWidget(
     logs: List<String>
 ) {
     Box(modifier = Modifier
-        .clip(RoundedCornerShape(topStart = 10.dp, bottomEnd = 10.dp))
-        .height(160.dp)
-        .width(280.dp)
+        .clip(
+            RoundedCornerShape(
+                topStart = 10.dp,
+                bottomEnd = 10.dp,
+                topEnd = 10.dp,
+                bottomStart = 10.dp
+            )
+        )
+        .height(100.dp)
+        .width(360.dp)
         .background(Color.Black)
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier
-                .padding(15.dp)
+                .padding(8.dp)
                 .fillMaxSize()
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.fillMaxWidth()
-            ) {
+                modifier = Modifier.fillMaxWidth(),
+                ) {
                 Text(
-                    text = "Commands",
-                    color = Color.Red,
+                    text = "Terminal",
+                    color = Color.Green,
                     fontFamily = FontFamily.Monospace,
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold
                 )
             }
             Column(
@@ -438,14 +507,15 @@ fun StatusWidget(
                 logs.forEach { log ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Start,
+                        horizontalArrangement = Arrangement.Center,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
                             text = log,
-                            color = Color.Green,
+                            color = Color.White,
                             fontFamily = FontFamily.Monospace,
-                            style = MaterialTheme.typography.bodySmall
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
@@ -490,10 +560,9 @@ fun SettingsOverlay(
     socketPort: String,
     motorSpeedCoefficient: FloatArray,
     onDismiss: () -> Unit,
-    onSaveClick: (ip: String, port: String, fl: String, fr: String, br: String, bl: String) -> Unit,
-    onClickSave: (ip: String, port: String, fl: String, fr: String, br: String, bl: String) ->Unit,
+    onSaveClick: (ip: String, port: String, fl: Float, fr: Float, br: Float, bl: Float) -> Unit,
+    onClickSave: (ip: String, port: String, fl: Float, fr: Float, br: Float, bl: Float) ->Unit,
 ) {
-
     var currentIp by remember {
         mutableStateOf(socketIP)
     }
@@ -501,16 +570,16 @@ fun SettingsOverlay(
         mutableStateOf(socketPort)
     }
     var flCoefficient by remember {
-        mutableStateOf(motorSpeedCoefficient[2].toString())
+        mutableStateOf(motorSpeedCoefficient[2])
     }
     var frCoefficient by remember {
-        mutableStateOf(motorSpeedCoefficient[3].toString())
+        mutableStateOf(motorSpeedCoefficient[3])
     }
     var brCoefficient by remember {
-        mutableStateOf(motorSpeedCoefficient[0].toString())
+        mutableStateOf(motorSpeedCoefficient[0])
     }
     var blCoefficient by remember {
-        mutableStateOf(motorSpeedCoefficient[1].toString())
+        mutableStateOf(motorSpeedCoefficient[1])
     }
     Box(
         modifier = Modifier
@@ -518,7 +587,6 @@ fun SettingsOverlay(
             .background(Grey80)
             .padding(10.dp),
         contentAlignment = Alignment.Center,
-
     ) {
         Column(
             modifier = Modifier
@@ -527,25 +595,6 @@ fun SettingsOverlay(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Row(
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .fillMaxWidth()
-                    .height(50.dp)
-                    .background(Color.Black),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = "Settings",
-                    style = MaterialTheme.typography.titleMedium,
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Bold,
-                    color = Orange80,
-                    fontFamily = FontFamily.Monospace,
-                )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
             TextField(
                 value = currentIp,
                 onValueChange = { currentIp = it },
@@ -571,61 +620,83 @@ fun SettingsOverlay(
                 )
             )
             Spacer(modifier = Modifier.height(8.dp))
+
             Row(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
             ) {
-                TextField(
-                    value = flCoefficient,
-                    onValueChange = {flCoefficient = it},
-                    label = { Text(text = "FL", color=Color.White, fontFamily = FontFamily.Monospace) },
-                    modifier = Modifier
-                        .background(Color.Black)
-                        .width(80.dp),
-                    colors = TextFieldDefaults.textFieldColors(
-                        containerColor = Color.Black,
-                        textColor = Color.White
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(text = "FL", color = Color.White, fontFamily = FontFamily.Monospace)
+                    Slider(
+                        value = flCoefficient,
+                        onValueChange = { flCoefficient = it },
+                        valueRange = 0f..4f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.White,
+                            activeTrackColor = Orange80
+                        ),
+                        modifier = Modifier.width(80.dp)
                     )
-                )
-                TextField(
-                    value = frCoefficient,
-                    onValueChange = {frCoefficient = it },
-                    label = { Text(text = "FR", color=Color.White, fontFamily = FontFamily.Monospace) },
-                    modifier = Modifier
-                        .background(Color.Black)
-                        .width(80.dp),
-                    colors = TextFieldDefaults.textFieldColors(
-                        containerColor = Color.Black,
-                        textColor = Color.White
+                    Text(text = String.format("%.2f", flCoefficient), color = Color.White, fontFamily = FontFamily.Monospace)
+                }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(text = "FR", color = Color.White, fontFamily = FontFamily.Monospace)
+                    Slider(
+                        value = frCoefficient,
+                        onValueChange = { frCoefficient = it },
+                        valueRange = 0f..4f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.White,
+                            activeTrackColor = Orange80
+                        ),
+                        modifier = Modifier.width(80.dp)
                     )
-                )
-                TextField(
-                    value = brCoefficient,
-                    onValueChange = {brCoefficient = it },
-                    label = { Text(text = "BR", color=Color.White, fontFamily = FontFamily.Monospace) },
-                    modifier = Modifier
-                        .background(Color.Black)
-                        .width(80.dp),
-                    colors = TextFieldDefaults.textFieldColors(
-                        containerColor = Color.Black,
-                        textColor = Color.White
+                    Text(text = String.format("%.2f", frCoefficient), color = Color.White, fontFamily = FontFamily.Monospace)
+                }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(text = "BR", color = Color.White, fontFamily = FontFamily.Monospace)
+                    Slider(
+                        value = brCoefficient,
+                        onValueChange = { brCoefficient = it },
+                        valueRange = 0f..4f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.White,
+                            activeTrackColor = Orange80
+                        ),
+                        modifier = Modifier.width(80.dp)
                     )
-                )
-                TextField(
-                    value = blCoefficient,
-                    onValueChange = {blCoefficient = it },
-                    label = { Text(text = "BL", color=Color.White, fontFamily = FontFamily.Monospace) },
-                    modifier = Modifier
-                        .background(Color.Black)
-                        .width(80.dp),
-                    colors = TextFieldDefaults.textFieldColors(
-                        containerColor = Color.Black,
-                        textColor = Color.White
+                    Text(text = String.format("%.2f", brCoefficient), color = Color.White, fontFamily = FontFamily.Monospace)
+                }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(text = "BL", color = Color.White, fontFamily = FontFamily.Monospace)
+                    Slider(
+                        value = blCoefficient,
+                        onValueChange = { blCoefficient = it },
+                        valueRange = 0f..4f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.White,
+                            activeTrackColor = Orange80
+                        ),
+                        modifier = Modifier.width(80.dp)
                     )
-                )
+                    Text(text = String.format("%.2f", blCoefficient), color = Color.White, fontFamily = FontFamily.Monospace)
+                }
             }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(
@@ -633,7 +704,11 @@ fun SettingsOverlay(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Button(
-                    onClick = { onSaveClick(currentIp, currentPort, flCoefficient, frCoefficient, brCoefficient, blCoefficient); onDismiss(); onClickSave(currentIp, currentPort, flCoefficient, frCoefficient, brCoefficient, blCoefficient)},
+                    onClick = {
+                        onSaveClick(currentIp, currentPort, flCoefficient, frCoefficient, brCoefficient, blCoefficient)
+                        onDismiss()
+                        onClickSave(currentIp, currentPort, flCoefficient, frCoefficient, brCoefficient, blCoefficient)
+                    },
                     modifier = Modifier.padding(start = 8.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color.Black,
@@ -647,7 +722,39 @@ fun SettingsOverlay(
     }
 }
 
+@Composable
+fun FineDriveContainer(onActionButtonClick: ((String) -> Unit)?) {
+    Column(
+        modifier = Modifier
+            .fillMaxHeight(),
+        verticalArrangement = Arrangement.SpaceBetween,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+       Row(
+           horizontalArrangement = Arrangement.Center,
+           verticalAlignment = Alignment.CenterVertically
+       ) {
+           DirectionButton({onActionButtonClick?.invoke("w")} ,id = R.drawable.up_arrow, {onActionButtonClick?.invoke("x")})
+       }
+        Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            DirectionButton({onActionButtonClick?.invoke("a")} ,id = R.drawable.left_arrow, {onActionButtonClick?.invoke("x")})
+            Spacer(modifier = Modifier.width(5.dp))
+            DirectionButton({onActionButtonClick?.invoke("x")} ,id = R.drawable.circle, {onActionButtonClick?.invoke("x")})
+            Spacer(modifier = Modifier.width(5.dp))
+            DirectionButton({onActionButtonClick?.invoke("z")} ,id = R.drawable.right_arrow, {onActionButtonClick?.invoke("x")})
 
+        }
+        Row(
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            DirectionButton({onActionButtonClick?.invoke("q")} ,id = R.drawable.down_arrow, {onActionButtonClick?.invoke("x")})
+        }
+    }
+}
 
 @Composable
 fun ActionButtonContainer(onActionButtonClick: ((String) -> Unit)?) {
@@ -655,33 +762,101 @@ fun ActionButtonContainer(onActionButtonClick: ((String) -> Unit)?) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween,
         modifier = Modifier
-            .height(200.dp)
-            .width(320.dp)
+            .height(220.dp)
+            .width(220.dp)
             .padding(15.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.Center,
             modifier = Modifier.fillMaxWidth()
         ) {
-            ActionButton(btnText = "PICK", onButtonClick = { onActionButtonClick?.invoke("g") })
-            ActionButton(btnText = "DROP", onButtonClick = { onActionButtonClick?.invoke("l") })
+            ActionButton(btnText = "U", onButtonClick = { onActionButtonClick?.invoke("u") }, secondaryColor = Color.Yellow)
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier.fillMaxWidth()
         ) {
-            ActionButton(btnText = "LOWER", onButtonClick = { onActionButtonClick?.invoke("d") })
-            ActionButton(btnText = "RAISE", onButtonClick = { onActionButtonClick?.invoke("u") })
+            ActionButton(btnText = "P", onButtonClick = { onActionButtonClick?.invoke("g") }, secondaryColor = Color.Blue)
+            ActionButton(btnText = "S", onButtonClick = { onActionButtonClick?.invoke("r") }, secondaryColor = Color.White)
+            ActionButton(btnText = "X", onButtonClick = { onActionButtonClick?.invoke("l") }, secondaryColor = Color.Red)
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.Center,
             modifier = Modifier.fillMaxWidth()
         ) {
-            ActionButton(btnText = "STOP", onButtonClick = { onActionButtonClick?.invoke("e") })
-            ActionButton(btnText = "SHOOT", onButtonClick = { onActionButtonClick?.invoke("r") })
+            ActionButton(btnText = "D", onButtonClick = { onActionButtonClick?.invoke("d") }, secondaryColor = Color.Green)
         }
+    }
+}
+
+@Composable
+fun ActionButtonColumnRight(onActionButtonClick: ((String) -> Unit)?) {
+    Column (
+        modifier = Modifier
+            .height(220.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        ActionButton(btnText = "G", onButtonClick = { onActionButtonClick?.invoke("p") }, secondaryColor = ShinyPink)
+        Spacer(modifier = Modifier.height(10.dp))
+        ActionButton(btnText = "L", onButtonClick = { onActionButtonClick?.invoke("o") }, secondaryColor = Cyan)
+    }
+}
+
+@Composable
+fun ActionButtonColumnLeft(onActionButtonClick: ((String) -> Unit)?) {
+    Column (
+        modifier = Modifier
+            .height(220.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        ActionButton(btnText = "M", onButtonClick = { onActionButtonClick?.invoke("h") }, secondaryColor = Purple40)
+        Spacer(modifier = Modifier.height(10.dp))
+        ActionButton(btnText = "N", onButtonClick = { onActionButtonClick?.invoke("k") }, secondaryColor = Pink40)
+    }
+}
+
+@Composable
+fun DirectionButton(
+    onButtonClick: (() -> Unit)? = null,
+    @DrawableRes id: Int,
+    onStop: (() -> Unit)? = null
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    LaunchedEffect(isPressed) {
+        while (isPressed) {
+            onButtonClick?.invoke()
+            delay(100) // Adjust delay as needed for desired repetition speed
+        }
+        onStop?.invoke()
+    }
+
+    Button(
+        onClick = { /* Do nothing here */ },
+        interactionSource = interactionSource,
+        enabled = true,
+        modifier = Modifier
+            .height(50.dp)
+            .width(50.dp),
+        shape = CircleShape,
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 10.dp),
+        colors = ButtonDefaults.buttonColors(
+            contentColor = if (isPressed) Color.Black else Orange80,
+            containerColor = if (isPressed) Orange80 else Color.Black,
+        ),
+        contentPadding = PaddingValues(15.dp)
+    ) {
+        Image(
+            painter = painterResource(id),
+            contentDescription = "Direction Button",
+            contentScale = ContentScale.Inside,
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }

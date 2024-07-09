@@ -154,13 +154,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun onSaveClick(ip: String, port: String, fl: String, fr: String, br: String, bl: String) {
+    private fun onSaveClick(ip: String, port: String, fl: Float, fr: Float, br: Float, bl: Float) {
         this.socketIP = ip
         this.socketPort = port
-        this.motorSpeedCoefficient[2] = fl.toFloat()
-        this.motorSpeedCoefficient[3] = fr.toFloat()
-        this.motorSpeedCoefficient[0] = br.toFloat()
-        this.motorSpeedCoefficient[1] = bl.toFloat()
+        this.motorSpeedCoefficient[2] = fl
+        this.motorSpeedCoefficient[3] = fr
+        this.motorSpeedCoefficient[0] = br
+        this.motorSpeedCoefficient[1] = bl
 
         sendMotorSpeedCoefficient(motorSpeedCoefficient)
 
